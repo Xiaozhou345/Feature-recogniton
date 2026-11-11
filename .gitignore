@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 训练产物（权重/日志不进仓库）
+runs/
+*.pth
+*.onnx
+*.ckpt
+
+# Office 临时锁文件
+~$*
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
