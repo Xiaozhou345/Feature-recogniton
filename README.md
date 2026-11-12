@@ -78,7 +78,7 @@ baseline（lr=1e-4、AdamW、DiceLoss、ReLU6）为各模型搜索起点；各�
 
 - 模型 1 ResNet50-SFPN（C，4 组）
 - 模型 2 VGG16-UNet（D，4 组）
-- 模型 3 MobileNetV3-SFPN（E，4 组，在 AI Studio 上跑，F 提供平台环境）
+- 模型 3 MobileNetV3-SFPN（E，4 组）
 
 所有记录汇入 E 的调参记录表（模型 × 配置 × val mIoU / PA / 时长）。
 
