@@ -28,26 +28,23 @@ featureRecognition/
 
 ## 关键修改（相对原 recognition.py，答辩素材）
 
-1. **训练策略改进**：最优 checkpoint 由「按 val loss 保存」改为「按 val mIoU 保存」，
-   使模型选择标准与最终评测指标（mIoU）对齐（train.py 中有注释标记）。
-2. **骨干参数化**：`--backbone resnet50|mobilenet_v3|vgg16_unet` 一键切换三个模型，
-   三个模型共用同一套数据管线 / 损失 / 评测代码，保证对比公平。
+1. **训练策略改进**：最优 checkpoint 由「按 val loss 保存」改为「按 val mIoU 保存」，使模型选择标准与最终评测指标（mIoU）对齐（train.py 中有注释标记）。
+2. **骨干参数化**：`--backbone resnet50|mobilenet_v3|vgg16_unet` 一键切换三个模型，三个模型共用同一套数据管线 / 损失 / 评测代码，保证对比公平。
 3. **新增评测体系**：原项目没有任何指标计算，现基于混淆矩阵输出 PA/mIoU/每类指标。
-4. **新增 Dice+CE 损失**：业界事实标准（nnU-Net 同款思路），弥补纯 Dice 在
-   batch=1 下小类别梯度噪声大的缺陷；`dice_wce` 支持按类别占比加权。
+4. **新增 Dice+CE 损失**：业界事实标准（nnU-Net 同款思路），弥补纯 Dice 在 batch=1 下小类别梯度噪声大的缺陷；`dice_wce` 支持按类别占比加权。
 5. **激活函数可切换**：`--activation relu6|silu`（调参变量）。
 6. **早停**：val mIoU 连续 patience 轮（默认 6）不提升即停止，与 25 epoch 上限配合。
 
 ## 统一实验协议（全组遵守）
 
-| 项 | 值 |
-|---|---|
-| 随机种子 | 42 |
-| 输入尺寸 | 1024×1024 |
-| batch size | 1 |
-| epoch | 短训 10 / 正式 25（上限）+ patience=6 早停 |
-| 选模型指标 | val mIoU |
-| 最终成绩 | 独立测试集 mIoU（主）+ PA + 每类 IoU |
+| 项         | 值                                        |
+| ---------- | ----------------------------------------- |
+| 随机种子   | 42                                        |
+| 输入尺寸   | 1024×1024                                 |
+| batch size | 1                                         |
+| epoch      | 短训 10 / 正式 25（上限）+ patience=6 早停 |
+| 选模型指标 | val mIoU                                  |
+| 最终成绩   | 独立测试集 mIoU（主）+ PA + 每类 IoU       |
 
 ## 快速开始
 

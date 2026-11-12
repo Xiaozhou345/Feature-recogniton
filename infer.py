@@ -18,11 +18,11 @@ from metrics import CLASS_NAMES_7
 CLASS_COLORS = np.array([
     [245, 245, 245],  # Background
     [220, 20, 60],    # Building
-    [0, 100, 0],      # Road
+    [128, 128, 128],  # Road
     [30, 144, 255],   # Water
     [255, 165, 0],    # Wasteland
     [0, 128, 0],      # Forest
-    [154, 205, 50],   # Farmland
+    [255, 255, 0],    # Farmland
 ], dtype=np.uint8)
 
 
