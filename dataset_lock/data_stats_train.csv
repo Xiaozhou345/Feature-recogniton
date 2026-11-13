@@ -1,0 +1,8 @@
+split,label_id,class,pixels,ratio_pct,images_containing
+train,1,Background,818691312,32.1556,2475
+train,2,Building,234848505,9.2241,1881
+train,3,Road,136258978,5.3518,2058
+train,4,Water,225278120,8.8482,1810
+train,5,Wasteland,120667817,4.7394,1139
+train,6,Forest,392702256,15.4241,2129
+train,7,Farmland,617586935,24.2568,1569

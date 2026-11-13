@@ -1,0 +1,8 @@
+split,label_id,class,pixels,ratio_pct,images_containing
+val,1,Background,274966673,32.3360,824
+val,2,Building,78545645,9.2369,615
+val,3,Road,44873816,5.2771,675
+val,4,Water,71995139,8.4666,610
+val,5,Wasteland,38539056,4.5322,364
+val,6,Forest,133605566,15.7120,703
+val,7,Farmland,207816302,24.4391,527
