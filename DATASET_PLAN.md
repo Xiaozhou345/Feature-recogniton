@@ -168,7 +168,7 @@ python infer.py --imgsz 512 --checkpoint runs/r50_final_best.pth --image demo.pn
 - [x] `VALIDATION.txt` 显示「校验结果: 通过」
 - [x] 三分图/掩码文件名对齐且互斥，掩码取值 ⊆ {0..7}
 - [x] 三分各类像素占比最大差 ≤1 pp（实测 0.43 pp）
-- [ ] `split_manifest.csv` 已提交仓库并通知全组（已复制到 `dataset_lock/`，待 git 提交 + 发通知）
+- [ ] 正式锁定通知已发群（清单随 `17ff650` 提交；文本见 `dataset_lock/NOTICE.md`，简版模板见第 9 节）
 - [ ] 12 组短训全部跑满 8 轮（日志 CSV 行数一致，无早停）
 - [ ] train / eval / infer 三处命令都带 `--imgsz 512`
 - [ ] 全部实验 seed=42、bs=1、冻结骨干状态一致
@@ -178,6 +178,8 @@ python infer.py --imgsz 512 --checkpoint runs/r50_final_best.pth --image demo.pn
 ---
 
 ## 9. 给全组的通知模板（可直接复制）
+
+完整通知文本另存于 `dataset_lock/NOTICE.md`（含 commit 号与 AI Studio 上传说明），发群时直接复制该文件即可。本处保留简版模板备查。注意：成员 B 的个人答辩准备材料不进仓库。
 
 > 【数据集已锁定 v1】统一使用 `E:\AIshixun\dataset_locked_v1\train|val|test\images_png|masks_png`，划分清单见 `split_manifest.csv`，**锁定后不再改动**。
 > 规模：train 2519 / val 837 / test 835（60/20/20，主导类分层系统抽样）。**图像与掩码已离线重采样为 512×512**（图像双线性 / 掩码最近邻），含标签 8 的 235 张掩码已清洗为 0（忽略）。
