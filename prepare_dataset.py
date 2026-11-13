@@ -9,7 +9,11 @@
 
 用法（默认 dry-run，只读、不写任何文件）：
   python prepare_dataset.py
-  python prepare_dataset.py --apply --imgsz 512 --out E:\\AIshixun\\dataset_locked_v1
+  python prepare_dataset.py --apply --imgsz 512
+
+路径约定：原始数据目录与锁定输出目录默认取「本脚本所在仓库的上一级」，
+即 <工作区>/分割DA_high_photo 与 <工作区>/dataset_locked_v1；换机器或换挂载点
+用 --data-root / --out 显式指定，不在代码或文档里写死某台机器的绝对路径。
 
 --apply 产物（全部写在新目录，原始 1024 PNG 保持不动）：
   <out>/train|val|test/images_png|masks_png/   供 train.py / eval.py 直接使用
@@ -41,11 +45,18 @@ SRC_DIRS = [
 ]
 SPLIT_NAMES = ("train", "val", "test")
 
+# 默认路径按脚本位置推导：仓库 Feature-recogniton/ 的上一级即工作区根目录。
+# 不写死盘符，换机器只需保持目录结构或用 --data-root / --out 覆盖。
+HERE = os.path.dirname(os.path.abspath(__file__))
+WORKSPACE = os.path.dirname(HERE)
+
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--data-root", default=r"E:\AIshixun\分割DA_high_photo")
-    p.add_argument("--out", default=r"E:\AIshixun\dataset_locked_v1")
+    p.add_argument("--data-root", default=os.path.join(WORKSPACE, "分割DA_high_photo"),
+                   help="原始 1024 数据目录；换机器时用此参数指定")
+    p.add_argument("--out", default=os.path.join(WORKSPACE, "dataset_locked_v1"),
+                   help="锁定数据集输出目录；换机器时用此参数指定")
     p.add_argument("--pattern", default="0,0,0,1,2",
                    help="桶内循环分配模式，0/1/2 对应 train/val/test；默认 60/20/20")
     p.add_argument("--imgsz", type=int, default=0,

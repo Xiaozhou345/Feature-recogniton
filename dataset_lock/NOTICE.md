@@ -6,7 +6,9 @@
 
 【数据集已锁定 v1，请全员切换】
 
-统一使用 `E:\AIshixun\dataset_locked_v1\train|val|test\images_png|masks_png`，划分清单见仓库 `dataset_lock/split_manifest.csv`，**锁定后不再改动**，任何改动需全组同意并重跑全部实验。
+> 路径说明：以下路径均相对各自的工作区根目录（`dataset_locked_v1` 的父目录），请按本机或 AI Studio 的实际位置替换，不要照抄某台机器的绝对路径。
+
+统一使用 `dataset_locked_v1\train|val|test\images_png|masks_png`，划分清单见仓库 `dataset_lock/split_manifest.csv`，**锁定后不再改动**，任何改动需全组同意并重跑全部实验。
 
 规模：train 2519 / val 837 / test 835（60/20/20，主导类分层系统抽样）。图像与掩码已离线重采样为 512×512（图像双线性 / 掩码最近邻）；含标签 8 的 235 张掩码已清洗为 0 忽略。
 
@@ -19,3 +21,4 @@
 1809 张官方无标签 Test 仅供 F 演示，不进任何指标；旧权重 `sfpnr50.pth` / `soba.pth` 禁用。
 
 数据与方案已提交（commit `17ff650`）；1.69 GB 数据本体在锁定目录，F 上传 AI Studio 时单独拷贝，不要传进 git。
+

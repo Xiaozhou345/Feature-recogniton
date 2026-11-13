@@ -91,11 +91,11 @@
 ## 5. 执行步骤与时间线（第 9 周内完成，越早越好）
 
 1. 全组确认第 11 节的 3 个决策点 → 本方案定稿。
-2. `python prepare_dataset.py`（只读预演）→ 核对数字；确认后 `python prepare_dataset.py --apply --imgsz 512 --out E:\AIshixun\dataset_locked_v1`。
+2. `python prepare_dataset.py`（只读预演）→ 核对数字；确认后 `python prepare_dataset.py --apply --imgsz 512 --out <WORKSPACE>/dataset_locked_v1`。
    - 离线模式把 4191 张图像按 BILINEAR、掩码按 NEAREST 重采样为 512×512 后落盘，同时把 235 张掩码里的标签 8 清洗为 0；此模式不再使用硬链接。
    - `VALIDATION.txt` 复检落盘尺寸（512×512）、掩码取值 ⊆ {0..7}、三分互斥；统计与类别权重仍按原始 1024 掩码计算。
    - 原始数据目录**不做任何修改**；需要回退 1024 时用 `--imgsz 0` 重新生成即可。
-3. 锁定目录 `E:\AIshixun\dataset_locked_v1` **在 git 仓库 `Feature-recogniton/` 之外**，1.69 GB 图像不该进仓库。只需把 6 个小文件复制到仓库内的 `dataset_lock/` 再提交：`split_manifest.csv`、`data_stats_train/val/test.csv`、`class_weights.txt`、`VALIDATION.txt`；图像与掩码留在锁定目录，不提交。（已复制完成，见下方锁定执行记录。）按第 9 节模板通知全组 → **锁定，之后任何改动都要全组同意并重跑全部实验**。
+3. 锁定目录 `dataset_locked_v1` **在 git 仓库 `Feature-recogniton/` 之外**，1.69 GB 图像不该进仓库。只需把 6 个小文件复制到仓库内的 `dataset_lock/` 再提交：`split_manifest.csv`、`data_stats_train/val/test.csv`、`class_weights.txt`、`VALIDATION.txt`；图像与掩码留在锁定目录，不提交。（已复制完成，见下方锁定执行记录。）按第 9 节模板通知全组 → **锁定，之后任何改动都要全组同意并重跑全部实验**。
 4. 训练机上用最重的 VGG16-UNet + 512 跑一次 `--epochs 1`，从 `runs/*_log.csv` 读 `epoch_seconds` 得 T；总耗时 ≈ (12×8 + 3×20) × T = **156 × T**（最坏情况，早停会更少）。用实测 T 回头确认 8/20 是否需要微调。
 5. 撰写数据集文档（来源与规模、类别分布、划分方式、清洗与预处理、增强策略及依据），交 A 汇入报告；准备 Pre 陈述。
 
@@ -103,7 +103,7 @@
 
 | 项 | 结果 |
 |---|---|
-| 命令 | `prepare_dataset.py --apply --imgsz 512 --out E:\AIshixun\dataset_locked_v1` |
+| 命令 | `prepare_dataset.py --apply --imgsz 512 --out <WORKSPACE>/dataset_locked_v1` |
 | 耗时 | 4 分 40 秒 |
 | 落盘 | train 2519 + val 837 + test 835 = 4191 组图像/掩码，全部 512×512，合计 **1.69 GB** |
 | 清洗 | 235 张掩码的标签 8 归 0；抽验 `1091.png` 落盘标签 ⊆ {0..7} |
@@ -135,13 +135,15 @@
 
 ## 7. 全组统一命令模板
 
+> 路径约定：`<WORKSPACE>` 指工作区根目录，即 `dataset_locked_v1` 所在的父目录。各成员按本机或 AI Studio 的实际挂载点替换，**不要写死任何一台机器的盘符或绝对路径**；`prepare_dataset.py` 的默认目录也按此布局推导。
+
 ```bash
 # 短训（C/D/E 各 4 组，共 12 组；第 1 组为 baseline）
 python train.py --imgsz 512 --backbone resnet50 \
-  --train-img E:/AIshixun/dataset_locked_v1/train/images_png \
-  --train-mask E:/AIshixun/dataset_locked_v1/train/masks_png \
-  --val-img   E:/AIshixun/dataset_locked_v1/val/images_png \
-  --val-mask  E:/AIshixun/dataset_locked_v1/val/masks_png \
+  --train-img <WORKSPACE>/dataset_locked_v1/train/images_png \
+  --train-mask <WORKSPACE>/dataset_locked_v1/train/masks_png \
+  --val-img   <WORKSPACE>/dataset_locked_v1/val/images_png \
+  --val-mask  <WORKSPACE>/dataset_locked_v1/val/masks_png \
   --epochs 8 --patience 99 --seed 42 --run-name r50_c1
 
 # 正式训练（用短训选出的最优配置）
@@ -152,8 +154,8 @@ python train.py --imgsz 512 ... 同上的四个路径 ... \
 
 # 测试集最终评测（E）
 python eval.py --imgsz 512 --checkpoint runs/r50_final_best.pth \
-  --test-img E:/AIshixun/dataset_locked_v1/test/images_png \
-  --test-mask E:/AIshixun/dataset_locked_v1/test/masks_png
+  --test-img <WORKSPACE>/dataset_locked_v1/test/images_png \
+  --test-mask <WORKSPACE>/dataset_locked_v1/test/masks_png
 
 # 单图演示（F，可用 1809 张无标签图中的任意一张）
 python infer.py --imgsz 512 --checkpoint runs/r50_final_best.pth --image demo.png
@@ -181,7 +183,7 @@ python infer.py --imgsz 512 --checkpoint runs/r50_final_best.pth --image demo.pn
 
 完整通知文本另存于 `dataset_lock/NOTICE.md`（含 commit 号与 AI Studio 上传说明），发群时直接复制该文件即可。本处保留简版模板备查。注意：成员 B 的个人答辩准备材料不进仓库。
 
-> 【数据集已锁定 v1】统一使用 `E:\AIshixun\dataset_locked_v1\train|val|test\images_png|masks_png`，划分清单见 `split_manifest.csv`，**锁定后不再改动**。
+> 【数据集已锁定 v1】统一使用 `dataset_locked_v1\train|val|test\images_png|masks_png`，划分清单见 `split_manifest.csv`，**锁定后不再改动**。
 > 规模：train 2519 / val 837 / test 835（60/20/20，主导类分层系统抽样）。**图像与掩码已离线重采样为 512×512**（图像双线性 / 掩码最近邻），含标签 8 的 235 张掩码已清洗为 0（忽略）。
 > 协议：三个入口仍保留 `--imgsz 512` 作双保险（数据本身已是 512）；短训 8 epoch + `--patience 99`（不早停）；正式训练上限 20 epoch + patience=5；seed=42、bs=1 不变。
 > 校验：`VALIDATION.txt` 通过（落盘 512×512、三分互斥、掩码取值 ⊆ {0..7}）；清单与统计在仓库 `dataset_lock/`。

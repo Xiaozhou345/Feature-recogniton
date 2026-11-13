@@ -2,7 +2,9 @@
 
 成员 B　｜　2026-11-13　｜　供 A 汇入实验报告
 
-> 本文所有数字均可由 `prepare_dataset.py` 与 `dataset_lock/` 下的清单、统计 CSV 复现；数据本体位于 `E:\AIshixun\dataset_locked_v1`，已锁定，全组共用。
+> 路径说明：文中数据路径均相对各自的工作区根目录（`dataset_locked_v1` 的父目录），请按本机或 AI Studio 的实际位置替换。
+>
+> 本文所有数字均可由 `prepare_dataset.py` 与 `dataset_lock/` 下的清单、统计 CSV 复现；数据本体位于 `dataset_locked_v1`，已锁定，全组共用。
 
 ---
 
@@ -126,7 +128,7 @@ Datasheet 正文给出的标签体系为：0 = no-data（应忽略），1 = back
 ## 7 可复现性与校验
 
 - 划分、清洗、重采样由 `prepare_dataset.py --apply --imgsz 512` 一次完成；划分算法确定性，不依赖随机种子。
-- 锁定目录 `E:\AIshixun\dataset_locked_v1` 共 4191 组 512×512 图像/掩码，合计 1.69 GB；原始 1024 数据未改动，可用 `--imgsz 0` 重新生成回退。
+- 锁定目录 `dataset_locked_v1` 共 4191 组 512×512 图像/掩码，合计 1.69 GB；原始 1024 数据未改动，可用 `--imgsz 0` 重新生成回退。
 - `dataset_lock/VALIDATION.txt` 显示校验通过：三分文件名互斥（交集均为 0）、图/掩码对齐、落盘尺寸 512×512、掩码取值 ⊆ {0..7}、标签 8 清洗 235 张。
 - 独立抽验：每个 split 各抽 3 张，图像尺寸与模式、掩码尺寸、标签取值域全部正常；含标签 8 的 `1091.png` 落盘后标签 ⊆ {0..7}。
 - 仓库提交 `17ff650` 只包含方案、脚本、划分清单与统计（6 个小文件），1.69 GB 图像不入库，由 F 单独上传 AI Studio。
