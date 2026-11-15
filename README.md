@@ -33,16 +33,16 @@ featureRecognition/
 3. **新增评测体系**：原项目没有任何指标计算，现基于混淆矩阵输出 PA/mIoU/每类指标。
 4. **新增 Dice+CE 损失**：业界事实标准（nnU-Net 同款思路），弥补纯 Dice 在 batch=1 下小类别梯度噪声大的缺陷；`dice_wce` 支持按类别占比加权。
 5. **激活函数可切换**：`--activation relu6|silu`（调参变量）。
-6. **早停**：val mIoU 连续 patience 轮（默认 6）不提升即停止，与 25 epoch 上限配合。
+6. **早停与调度器**：早停按 val mIoU 连续 patience 轮不提升触发（默认 6）；ReduceLROnPlateau 可用 `--no-scheduler` 关闭（短训建议关闭，保证各组比较的是初始学习率）。
 
-## 统一实验协议（全组遵守）
+## 统一实验协议（全组遵守，v1 数据集锁定版）
 
 | 项         | 值                                        |
 | ---------- | ----------------------------------------- |
 | 随机种子   | 42                                        |
-| 输入尺寸   | 1024×1024                                 |
+| 输入尺寸   | 512×512（数据已离线重采样，见 `dataset_lock/`） |
 | batch size | 1                                         |
-| epoch      | 短训 10 / 正式 25（上限）+ patience=6 早停 |
+| epoch      | 短训 8（`--patience 99 --no-scheduler`）/ 正式 20（上限）+ patience=5 早停 |
 | 选模型指标 | val mIoU                                  |
 | 最终成绩   | 独立测试集 mIoU（主）+ PA + 每类 IoU       |
 
@@ -54,15 +54,18 @@ pip install -r requirements.txt
 # 1. 数据统计（成员B，三个 split 各跑一次）
 python data_stats.py --img-dir <images> --mask-dir <masks> --split train
 
-# 2. 调参短训示例（C/D/E 各自的模型，每模型 4 组）
+# 2. 调参短训示例（C/D/E 各自的模型，每模型 4 组；patience 99 与 --no-scheduler 为协议要求）
 python train.py --backbone resnet50 \
     --train-img <train_images> --train-mask <train_masks> \
     --val-img <val_images> --val-mask <val_masks> \
-    --epochs 10 --lr 1e-4 --optimizer adamw --loss dice \
-    --run-name r50_base
+    --imgsz 512 --epochs 8 --patience 99 --no-scheduler \
+    --lr 1e-4 --optimizer adamw --loss dice --run-name r50_c01
 
-# 3. 正式训练（最优配置，epochs 上限 25 + 早停）
-python train.py --backbone resnet50 ... --epochs 25 --run-name r50_final
+# 3. 正式训练（最优配置，epochs 上限 20 + patience=5 早停）
+python train.py --backbone resnet50 ... --epochs 20 --run-name r50_final
+
+# 3b. 断点续训（训练中断后从 _last.pth 恢复，续写同一 CSV；--epochs 填总轮数）
+python train.py ... --epochs 20 --run-name r50_final --resume runs/r50_final_last.pth
 
 # 4. 测试集评测（E）
 python eval.py --checkpoint runs/r50_final_best.pth \
@@ -74,7 +77,7 @@ python infer.py --checkpoint runs/r50_final_best.pth --image test.png
 
 ## 调参矩阵（共 12 组短训，见 PROJECT_PLAN.md 第四、五节）
 
-baseline（lr=1e-4、AdamW、DiceLoss、ReLU6）为各模型搜索起点；各负责人在 lr、优化器（AdamW/SGD）、损失（Dice / Dice+CE）、激活函数（ReLU6/SiLU）等维度自行组合尝试，每模型 4 组、以 val mIoU 最高者为最终配置：
+baseline（lr=1e-4、AdamW、DiceLoss、ReLU6）为各模型搜索起点；各负责人在 lr、优化器（AdamW/SGD）、损失（Dice / Dice+CE / 加权 Dice+CE）、激活函数（ReLU6/SiLU）等维度自行组合尝试，每模型 4 组、以 val mIoU 最高者为最终配置。荒地占比 4.74% < 5% 已触发类别权重建议（权重起点见 `dataset_lock/class_weights.txt`）：
 
 - 模型 1 ResNet50-SFPN（C，4 组）
 - 模型 2 VGG16-UNet（D，4 组）

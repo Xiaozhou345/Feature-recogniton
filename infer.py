@@ -50,7 +50,7 @@ def main():
                         activation=cfg.get("activation", "relu6")).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    print(f"✅ 模型: {args.checkpoint} | backbone={cfg.get('backbone')} | 训练时 val mIoU={ckpt.get('val_mIoU')}")
+    print(f"[OK] 模型: {args.checkpoint} | backbone={cfg.get('backbone')} | 训练时 val mIoU={ckpt.get('val_mIoU')}")
 
     pred_mask = torch.argmax(model(img_tensor), dim=1).squeeze(0).cpu().numpy()
     pred_color = CLASS_COLORS[pred_mask]
@@ -64,7 +64,7 @@ def main():
     plt.savefig(args.save, dpi=150, bbox_inches="tight")
     plt.show()
 
-    print("\n📊 分割结果统计:")
+    print("\n[数据] 分割结果统计:")
     total = pred_mask.size
     for cls_id, count in zip(*np.unique(pred_mask, return_counts=True)):
         print(f"   {CLASS_NAMES_7[cls_id]}: {count:,} 像素 ({count / total * 100:.2f}%)")

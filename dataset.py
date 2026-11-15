@@ -25,6 +25,7 @@ class RemoteSensingDataset(Dataset):
     """遥感图像 + 像素级掩码。标签体系：背景=1,建筑物=2,道路=3,水域=4,荒地=5,森林=6,农田=7（0=无数据，忽略）"""
 
     def __init__(self, img_dir, mask_dir, imgsz=1024):
+        self.img_dir, self.mask_dir = img_dir, mask_dir
         self.imgsz = imgsz
         self.img_names = [f for f in os.listdir(img_dir)
                           if os.path.splitext(f)[1].lower() in IMG_EXTS]
@@ -36,7 +37,7 @@ class RemoteSensingDataset(Dataset):
                 if os.path.exists(mask_path):
                     self.valid_pairs.append((fname, base + ext))
                     break
-        print(f"📊 数据集: 图像 {len(self.img_names)} 张, 有效配对 {len(self.valid_pairs)} 对")
+        print(f"[数据] 数据集: 图像 {len(self.img_names)} 张, 有效配对 {len(self.valid_pairs)} 对")
         self.transform = build_transform(imgsz)
 
     def __len__(self):

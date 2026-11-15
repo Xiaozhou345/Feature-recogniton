@@ -67,5 +67,5 @@ def load_sfpn_weights(model, weights_path, prefix_to_remove="en."):
             loaded += 1
         elif name in weight_dict:
             mismatched.append(name)
-    print(f"✅ SFPN 权重匹配: 成功 {loaded} 个, 形状不匹配 {len(mismatched)} 个")
+    print(f"[OK] SFPN 权重匹配: 成功 {loaded} 个, 形状不匹配 {len(mismatched)} 个")
     return loaded > 0

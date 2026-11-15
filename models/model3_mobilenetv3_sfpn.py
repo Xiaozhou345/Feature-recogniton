@@ -15,22 +15,23 @@ class MobileNetV3FPN(nn.Module):
     def __init__(self, pretrained=True):
         super().__init__()
         m = tv_models.mobilenet_v3_large(weights=_tv_weights(pretrained))
-        self.layer1 = m.features[:3]   # 24ch,  stride 4
-        self.layer2 = m.features[3:6]  # 40ch,  stride 8
-        self.layer3 = m.features[6:10] # 80ch,  stride 16
+        # FPN 三层取样点：s4 / s8 / s32，覆盖完整 MobileNetV3-Large（约 2.97M 参数）
+        self.layer1 = m.features[:3]    # 24ch,  stride 4
+        self.layer2 = m.features[3:7]   # 40ch,  stride 8
+        self.layer3 = m.features[7:]    # 160→960ch, stride 32（深层语义）
 
         self.fpn1 = nn.Conv2d(24, 128, 1)
         self.fpn2 = nn.Conv2d(40, 128, 1)
-        self.fpn3 = nn.Conv2d(80, 128, 1)
+        self.fpn3 = nn.Conv2d(960, 128, 1)
 
     def forward(self, x):
         feat1 = self.layer1(x)      # [B,24,H/4,W/4]
         feat2 = self.layer2(feat1)  # [B,40,H/8,W/8]
-        feat3 = self.layer3(feat2)  # [B,80,H/16,W/16]
+        feat3 = self.layer3(feat2)  # [B,960,H/32,W/32]
 
         f3 = self.fpn3(feat3)
-        f2 = self.fpn2(feat2) + F.interpolate(f3, scale_factor=2, mode='nearest')
-        f1 = self.fpn1(feat1) + F.interpolate(f2, scale_factor=2, mode='nearest')
+        f2 = self.fpn2(feat2) + F.interpolate(f3, size=feat2.shape[-2:], mode='nearest')
+        f1 = self.fpn1(feat1) + F.interpolate(f2, size=feat1.shape[-2:], mode='nearest')
         return f1
 
 

@@ -250,7 +250,7 @@ def write_outputs(out, records, labels, rows, weights, diff, imgsz=0):
 def main():
     args = parse_args()
     if args.imgsz not in (0, 512):
-        print(f"⚠️ 非标准尺寸 {args.imgsz}；本项目协议只约定 1024 与 512")
+        print(f"[警告] 非标准尺寸 {args.imgsz}；本项目协议只约定 1024 与 512")
     pattern = [int(x) for x in args.pattern.split(",")]
     if any(x not in (0, 1, 2) for x in pattern) or len(pattern) < 3:
         raise ValueError("--pattern 必须是 0/1/2 组成的至少 3 项，如 0,0,0,1,2")

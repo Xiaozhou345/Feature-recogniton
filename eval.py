@@ -20,11 +20,25 @@ def parse_args():
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--test-img", required=True)
     p.add_argument("--test-mask", required=True)
-    p.add_argument("--imgsz", type=int, default=1024)
+    p.add_argument("--imgsz", type=int, default=None, help="不传则自动读取 checkpoint 内训练时的 imgsz")
     p.add_argument("--batch-size", type=int, default=1)
     p.add_argument("--num-workers", type=int, default=2)
     p.add_argument("--save-csv", default=None, help="结果保存路径（默认与 checkpoint 同名 _eval.csv）")
+    p.add_argument("--tta", action="store_true", default=False,
+                   help="测试时增强：原图/水平翻转/旋转90/旋转270 四次预测取平均（推理约 4 倍耗时）")
     return p.parse_args()
+
+
+@torch.no_grad()
+def predict_logits(model, imgs, tta):
+    """单次预测或 4 变换 TTA 融合（结果均变换回原方向后取平均）"""
+    if not tta:
+        return model(imgs)
+    outs = [model(imgs)]
+    outs.append(torch.flip(model(torch.flip(imgs, dims=[3])), dims=[3]))
+    outs.append(torch.rot90(model(torch.rot90(imgs, k=1, dims=[2, 3])), k=-1, dims=[2, 3]))
+    outs.append(torch.rot90(model(torch.rot90(imgs, k=3, dims=[2, 3])), k=1, dims=[2, 3]))
+    return torch.stack(outs).mean(dim=0)
 
 
 @torch.no_grad()
@@ -35,22 +49,23 @@ def main():
     ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     cfg = ckpt.get("config", {})
     backbone = cfg.get("backbone", "resnet50")
+    imgsz = args.imgsz or cfg.get("imgsz", 512)
     model = build_model(backbone, cfg.get("n_classes", 7),
                         pretrained=False, freeze_backbone=False,
                         activation=cfg.get("activation", "relu6")).to(device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    print(f"✅ 已加载 {args.checkpoint} | backbone={backbone} "
+    print(f"[OK] 已加载 {args.checkpoint} | backbone={backbone} | imgsz={imgsz} | TTA={'开' if args.tta else '关'} "
           f"| 训练时最优 val mIoU={ckpt.get('val_mIoU', float('nan')):.4f}")
 
-    test_set = RemoteSensingDataset(args.test_img, args.test_mask, args.imgsz)
+    test_set = RemoteSensingDataset(args.test_img, args.test_mask, imgsz)
     loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False,
                         num_workers=args.num_workers, pin_memory=True)
 
     meter = SegmentationMetrics(cfg.get("n_classes", 7))
     for imgs, masks in loader:
         imgs = imgs.to(device)
-        pred = torch.argmax(model(imgs), dim=1).cpu().numpy()
+        pred = torch.argmax(predict_logits(model, imgs, args.tta), dim=1).cpu().numpy()
         meter.update(pred, masks.numpy())
 
     print("\n===== 测试集最终成绩 =====")
@@ -67,7 +82,7 @@ def main():
             w.writerow([f"IoU_{name}", f"{result['per_class_IoU'][i]:.4f}"])
             w.writerow([f"P_{name}", f"{result['per_class_Precision'][i]:.4f}"])
             w.writerow([f"R_{name}", f"{result['per_class_Recall'][i]:.4f}"])
-    print(f"\n📄 结果已保存: {csv_path}")
+    print(f"\n[OK] 结果已保存: {csv_path}")
 
 
 if __name__ == "__main__":
