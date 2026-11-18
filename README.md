@@ -1,6 +1,6 @@
 # Feature-recogniton — 遥感图像 7 类地物语义分割与多模型对比
 
-人工智能课程专题研究（专题 4 自主选题）训练框架。
+人工智能课程专题研究（专题 4 自主选题）训练框架。**框架：PaddlePaddle**（课程实践平台为百度 AIStudio，机器学习框架为百度 PaddlePaddle，已从 PyTorch 迁移）。
 代码源自小组原项目 `high_model/recognition.py`，重构为模块化训练框架。
 
 ## 项目结构
@@ -49,7 +49,7 @@ featureRecognition/
 ## 快速开始
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # AI Studio 自带 paddlepaddle-gpu，本地 CPU 版 paddlepaddle 即可跑通（仅推理/小训）
 
 # 1. 数据统计（成员B，三个 split 各跑一次）
 python data_stats.py --img-dir <images> --mask-dir <masks> --split train

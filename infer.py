@@ -1,4 +1,4 @@
-"""单图推理演示（成员F 的答辩演示脚本）——改造自 high_model/recognition_test.py。
+"""单图推理演示（PaddlePaddle 版，成员 F 的答辩演示脚本）——改造自 high_model/recognition_test.py。
 修改点：从统一训练框架的 checkpoint 加载（含 config），支持三个 backbone。
 用法示例：
   python infer.py --checkpoint runs/resnet50_best.pth --image <图片路径>
@@ -6,8 +6,7 @@
 import os
 import argparse
 import numpy as np
-import torch
-import torch.nn.functional as F
+import paddle
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -30,29 +29,33 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", default="runs/resnet50_best.pth")
     p.add_argument("--image", required=True)
-    p.add_argument("--imgsz", type=int, default=1024)
+    p.add_argument("--imgsz", type=int, default=None, help="不传则自动读取 checkpoint 内训练时的 imgsz")
     p.add_argument("--save", default="inference_result.png")
     return p.parse_args()
 
 
-@torch.no_grad()
+@paddle.no_grad()
 def main():
     args = parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    place = 'gpu' if (paddle.device.is_compiled_with_cuda()
+                      and paddle.device.cuda.device_count() > 0) else 'cpu'
+    paddle.set_device(place)
 
-    img = Image.open(args.image).convert("RGB")
-    img_tensor = build_transform(args.imgsz)(img).unsqueeze(0).to(device)
-
-    ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+    ckpt = paddle.load(args.checkpoint, return_numpy=False)
     cfg = ckpt.get("config", {})
+    imgsz = args.imgsz or cfg.get("imgsz", 512)
+    img = Image.open(args.image).convert("RGB")
+    img_tensor = build_transform(imgsz)(img).unsqueeze(0)
+
     model = build_model(cfg.get("backbone", "resnet50"), cfg.get("n_classes", 7),
                         pretrained=False, freeze_backbone=False,
-                        activation=cfg.get("activation", "relu6")).to(device)
-    model.load_state_dict(ckpt["model_state_dict"])
+                        activation=cfg.get("activation", "relu6"))
+    model.set_state_dict(ckpt["model_state_dict"])
     model.eval()
-    print(f"[OK] 模型: {args.checkpoint} | backbone={cfg.get('backbone')} | 训练时 val mIoU={ckpt.get('val_mIoU')}")
+    print(f"[OK] 模型: {args.checkpoint} | backbone={cfg.get('backbone')} | imgsz={imgsz} "
+          f"| 训练时 val mIoU={ckpt.get('val_mIoU')}")
 
-    pred_mask = torch.argmax(model(img_tensor), dim=1).squeeze(0).cpu().numpy()
+    pred_mask = paddle.argmax(model(img_tensor), axis=1).squeeze(0).cpu().numpy()
     pred_color = CLASS_COLORS[pred_mask]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
@@ -68,7 +71,7 @@ def main():
     total = pred_mask.size
     for cls_id, count in zip(*np.unique(pred_mask, return_counts=True)):
         print(f"   {CLASS_NAMES_7[cls_id]}: {count:,} 像素 ({count / total * 100:.2f}%)")
-    print(f"\n🎉 结果已保存: {args.save}")
+    print(f"\n[完成] 结果已保存: {args.save}")
 
 
 if __name__ == "__main__":

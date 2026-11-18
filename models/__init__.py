@@ -1,4 +1,4 @@
-"""模型包：三个模型各占一个文件，统一由 build_model 构建。
+"""模型包（PaddlePaddle 版）：三个模型各占一个文件，统一由 build_model 构建。
 
 - model1_resnet50_sfpn.py  模型 1：ResNet50-SFPN-DW（改进模型）
 - model2_vgg16_unet.py     模型 2：VGG16-UNet（经典网络）
@@ -6,6 +6,7 @@
 - common.py                三模型共用的激活函数 / 卷积块 / Decoder / 权重加载
 
 三个模型共用同一套数据 / 损失 / 评测管线，仅骨干网络不同。
+预训练权重统一来自 paddle.vision（ImageNet，自动从百度源下载）。
 """
 from .common import load_sfpn_weights
 from .model1_resnet50_sfpn import ResNet50SFPN, LightweightFPN

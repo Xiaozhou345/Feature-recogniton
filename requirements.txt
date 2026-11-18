@@ -1,6 +1,4 @@
-torch>=2.0
-torchvision>=0.15
+paddlepaddle>=2.6
 numpy
 pillow
 matplotlib
-tqdm

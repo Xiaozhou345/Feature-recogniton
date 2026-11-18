@@ -1,13 +1,13 @@
-"""损失函数——源自 high_model/recognition.py 的 DiceLoss，新增 Dice+CE 组合。
+"""损失函数（PaddlePaddle 版）——源自 high_model/recognition.py 的 DiceLoss，新增 Dice+CE 组合。
 修改点：DiceCELoss 支持类别权重（配合 data_stats.py 的类别占比做不均衡加权）。
 注意：分割任务的"准确率"(mIoU/PA)不可微，只能作为评测指标，不能当损失。
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import paddle
+import paddle.nn as nn
+import paddle.nn.functional as F
 
 
-class DiceLoss(nn.Module):
+class DiceLoss(nn.Layer):
     """多类 Dice 损失（忽略标签0的无数据区域），原实现"""
 
     def __init__(self, smooth=1e-5):
@@ -18,25 +18,25 @@ class DiceLoss(nn.Module):
         if outputs.shape[2:] != masks.shape[1:]:
             outputs = F.interpolate(outputs, size=masks.shape[1:],
                                     mode='bilinear', align_corners=False)
-        valid_mask = (masks != 0).float()
-        if valid_mask.sum() < 1:
-            return torch.tensor(0.5, device=outputs.device, requires_grad=True)
+        valid_mask = (masks != 0).astype('float32')
+        if float(valid_mask.sum()) < 1:
+            return paddle.mean(outputs) * 0.0 + 0.5  # 保持计算图连通的常数
 
-        outputs = F.softmax(outputs, dim=1)
+        outputs = F.softmax(outputs, axis=1)
         total_loss, class_count = 0.0, 0
         for c in range(outputs.shape[1]):
             pred = outputs[:, c] * valid_mask
-            target = (masks == (c + 1)).float() * valid_mask
+            target = (masks == (c + 1)).astype('float32') * valid_mask
             intersection = (pred * target).sum()
             union = pred.sum() + target.sum() + self.smooth
-            if union > self.smooth:
+            if float(union) > self.smooth:
                 total_loss += 1 - (2 * intersection + self.smooth) / (union + self.smooth)
                 class_count += 1
         return total_loss / class_count if class_count > 0 else \
-            torch.tensor(0.5, device=outputs.device, requires_grad=True)
+            paddle.mean(outputs) * 0.0 + 0.5
 
 
-class DiceCELoss(nn.Module):
+class DiceCELoss(nn.Layer):
     """Dice + 交叉熵组合（业界事实标准，如 nnU-Net）。
     CE 提供稳定的逐像素梯度，弥补纯 Dice 在小类别/batch=1 下的梯度噪声。
     """
@@ -45,22 +45,20 @@ class DiceCELoss(nn.Module):
     def __init__(self, ce_weight=None, smooth=1e-5):
         super().__init__()
         self.dice = DiceLoss(smooth)
-        self.ce_weight = None if ce_weight is None else torch.as_tensor(ce_weight, dtype=torch.float32)
+        self.ce_weight = None if ce_weight is None else paddle.to_tensor(ce_weight, dtype='float32')
 
     def forward(self, outputs, masks):
         if outputs.shape[2:] != masks.shape[1:]:
             outputs = F.interpolate(outputs, size=masks.shape[1:],
                                     mode='bilinear', align_corners=False)
         # CE 部分：标签 1-7 重映射为 0-6，标签 0(无数据)映射为 IGNORE_INDEX 并忽略
-        target_ce = masks.clone()
-        valid = masks != 0
-        target_ce[~valid] = self.IGNORE_INDEX
-        target_ce[valid] = target_ce[valid] - 1
-        if valid.sum() == 0:
-            return torch.tensor(0.5, device=outputs.device, requires_grad=True)
+        target_ce = paddle.where(masks != 0, masks - 1,
+                                 paddle.full_like(masks, self.IGNORE_INDEX))
+        if float((masks != 0).sum()) == 0:
+            return paddle.mean(outputs) * 0.0 + 0.5
         ce = F.cross_entropy(outputs, target_ce,
-                             weight=self.ce_weight.to(outputs.device) if self.ce_weight is not None else None,
-                             ignore_index=self.IGNORE_INDEX)
+                             weight=self.ce_weight if self.ce_weight is not None else None,
+                             ignore_index=self.IGNORE_INDEX, axis=1)
         # Dice 部分
         dice = self.dice(outputs, masks)
         return dice + ce

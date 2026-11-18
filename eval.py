@@ -1,4 +1,4 @@
-"""测试集评测——在独立测试集上输出最终成绩（PA / mIoU / 每类 IoU / P / R / Dice）。
+"""测试集评测（PaddlePaddle 版）——在独立测试集上输出最终成绩（PA / mIoU / 每类 IoU / P / R / Dice）。
 用法示例：
   python eval.py --checkpoint runs/resnet50_best.pth \
       --test-img <test_images_dir> --test-mask <test_masks_dir>
@@ -6,8 +6,9 @@
 import os
 import csv
 import argparse
-import torch
-from torch.utils.data import DataLoader
+import numpy as np
+import paddle
+from paddle.io import DataLoader
 
 from models import build_model
 from dataset import RemoteSensingDataset
@@ -29,44 +30,52 @@ def parse_args():
     return p.parse_args()
 
 
-@torch.no_grad()
+def _rot90_ccw(x, k=1):
+    """逆时针旋转 90°×k（等效 numpy.rot90 / torch.rot90，axes=[2,3]）"""
+    for _ in range(k % 4):
+        x = paddle.flip(paddle.transpose(x, perm=[0, 1, 3, 2]), axis=2)
+    return x
+
+
+@paddle.no_grad()
 def predict_logits(model, imgs, tta):
     """单次预测或 4 变换 TTA 融合（结果均变换回原方向后取平均）"""
     if not tta:
         return model(imgs)
     outs = [model(imgs)]
-    outs.append(torch.flip(model(torch.flip(imgs, dims=[3])), dims=[3]))
-    outs.append(torch.rot90(model(torch.rot90(imgs, k=1, dims=[2, 3])), k=-1, dims=[2, 3]))
-    outs.append(torch.rot90(model(torch.rot90(imgs, k=3, dims=[2, 3])), k=1, dims=[2, 3]))
-    return torch.stack(outs).mean(dim=0)
+    outs.append(paddle.flip(model(paddle.flip(imgs, axis=[3])), axis=[3]))
+    outs.append(_rot90_ccw(model(_rot90_ccw(imgs, k=1)), k=3))
+    outs.append(_rot90_ccw(model(_rot90_ccw(imgs, k=3)), k=1))
+    return paddle.stack(outs).mean(axis=0)
 
 
-@torch.no_grad()
+@paddle.no_grad()
 def main():
     args = parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    place = 'gpu' if (paddle.device.is_compiled_with_cuda()
+                      and paddle.device.cuda.device_count() > 0) else 'cpu'
+    paddle.set_device(place)
 
-    ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+    ckpt = paddle.load(args.checkpoint, return_numpy=False)
     cfg = ckpt.get("config", {})
     backbone = cfg.get("backbone", "resnet50")
     imgsz = args.imgsz or cfg.get("imgsz", 512)
     model = build_model(backbone, cfg.get("n_classes", 7),
                         pretrained=False, freeze_backbone=False,
-                        activation=cfg.get("activation", "relu6")).to(device)
-    model.load_state_dict(ckpt["model_state_dict"])
+                        activation=cfg.get("activation", "relu6"))
+    model.set_state_dict(ckpt["model_state_dict"])
     model.eval()
     print(f"[OK] 已加载 {args.checkpoint} | backbone={backbone} | imgsz={imgsz} | TTA={'开' if args.tta else '关'} "
           f"| 训练时最优 val mIoU={ckpt.get('val_mIoU', float('nan')):.4f}")
 
     test_set = RemoteSensingDataset(args.test_img, args.test_mask, imgsz)
     loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False,
-                        num_workers=args.num_workers, pin_memory=True)
+                        num_workers=args.num_workers, return_list=True)
 
     meter = SegmentationMetrics(cfg.get("n_classes", 7))
     for imgs, masks in loader:
-        imgs = imgs.to(device)
-        pred = torch.argmax(predict_logits(model, imgs, args.tta), dim=1).cpu().numpy()
-        meter.update(pred, masks.numpy())
+        pred = paddle.argmax(predict_logits(model, imgs, args.tta), axis=1).cpu().numpy()
+        meter.update(pred, masks.numpy() if hasattr(masks, 'numpy') else np.asarray(masks))
 
     print("\n===== 测试集最终成绩 =====")
     print(meter.summary_str(CLASS_NAMES_7))
