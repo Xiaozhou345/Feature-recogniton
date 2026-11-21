@@ -32,7 +32,8 @@ def parse_args():
     p.add_argument("--num-workers", type=int, default=2)
     # 模型
     p.add_argument("--backbone", default="resnet50",
-                   choices=["resnet50", "mobilenet_v3", "vgg16_unet"])
+                   choices=["resnet50", "resnet50_shallow", "mobilenet_v3", "vgg16_unet"],
+                   help="resnet50_shallow 为模型 1 的浅层跳连变体")
     p.add_argument("--n-classes", type=int, default=7)
     p.add_argument("--pretrained", action="store_true", default=True)
     p.add_argument("--no-pretrained", dest="pretrained", action="store_false")

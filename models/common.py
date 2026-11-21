@@ -55,18 +55,28 @@ class DepthwiseSeparableConv(nn.Layer):
 class MobileDecoder(nn.Layer):
     """移动端 Decoder（模型 1 / 3 共用，源自原实现）"""
 
-    def __init__(self, n_classes=7, activation="relu6"):
+    def __init__(self, n_classes=7, activation="relu6", *, shallow_skip=False):
         super().__init__()
         self.conv1 = DepthwiseSeparableConv(128, 64, activation=activation)
         self.conv2 = DepthwiseSeparableConv(64, 32, activation=activation)
         self.conv3 = DepthwiseSeparableConv(32, 16, activation=activation)
         self.out = nn.Conv2D(16, n_classes, kernel_size=1)
+        if shallow_skip:
+            # 零初始化使跳连从原解码路径的输出开始，再学习浅层特征的贡献。
+            self.shallow_projection = nn.Conv2D(
+                64, 64, kernel_size=1, bias_attr=False,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Constant(0.0)),
+            )
 
-    def forward(self, x):
-        x = self.conv1(x)                                            # [B,64,H/4,W/4]
-        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
-        x = self.conv2(x)                                            # [B,32,H/2,W/2]
-        x = self.conv3(x)                                            # [B,16,H,W]（FPN 特征本身为 H/4，需再上采样）
+    def forward(self, x, shallow=None):
+        x = self.conv1(x)
+        if shallow is None:
+            x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
+        else:
+            x = F.interpolate(x, size=shallow.shape[-2:], mode='bilinear', align_corners=False)
+            x = x + self.shallow_projection(shallow)
+        x = self.conv2(x)
+        x = self.conv3(x)
         return self.out(x)
 
 

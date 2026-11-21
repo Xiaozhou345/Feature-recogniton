@@ -30,11 +30,11 @@ class LightweightFPN(nn.Layer):
         self.fpn2 = nn.Conv2D(512, 128, 1)
         self.fpn3 = nn.Conv2D(1024, 128, 1)
 
-    def forward(self, x):
+    def forward(self, x, *, return_shallow=False):
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+        shallow = self.relu(x)      # 池化前特征：[B,64,H/2,W/2]
+        x = self.maxpool(shallow)
 
         feat1 = self.layer1(x)      # [B,256,H/4,W/4]
         feat2 = self.layer2(feat1)  # [B,512,H/8,W/8]
@@ -43,24 +43,31 @@ class LightweightFPN(nn.Layer):
         f3 = self.fpn3(feat3)
         f2 = self.fpn2(feat2) + F.interpolate(f3, size=feat2.shape[-2:], mode='nearest')
         f1 = self.fpn1(feat1) + F.interpolate(f2, size=feat1.shape[-2:], mode='nearest')
+        if return_shallow:
+            return f1, shallow
         return f1
 
 
 class ResNet50SFPN(nn.Layer):
     """ResNet50 FPN 骨干 + 移动端 Decoder（对应原 MobileRemoteSensingModel）"""
 
-    def __init__(self, n_classes=7, pretrained=True, freeze_backbone=True, activation="relu6"):
+    def __init__(self, n_classes=7, pretrained=True, freeze_backbone=True,
+                 activation="relu6", *, shallow_skip=False):
         super().__init__()
         self.backbone = LightweightFPN(pretrained)
-        self.decoder = MobileDecoder(n_classes, activation=activation)
+        self.decoder = MobileDecoder(n_classes, activation=activation, shallow_skip=shallow_skip)
+        self.shallow_skip = shallow_skip
 
         if freeze_backbone:
             freeze_layer(self.backbone)
 
     def forward(self, x):
         size = x.shape[-2:]
-        feat = self.backbone(x)          # [B,128,H/4,W/4]
-        out = self.decoder(feat)         # [B,7,H/2,W/2]（中间上采样一次）
+        if self.shallow_skip:
+            feat, shallow = self.backbone(x, return_shallow=True)
+            out = self.decoder(feat, shallow)
+        else:
+            out = self.decoder(self.backbone(x))
         if out.shape[-2:] != size:
             out = F.interpolate(out, size=size, mode='bilinear', align_corners=False)
         return out                       # [B,7,H,W]
