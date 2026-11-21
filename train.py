@@ -39,16 +39,22 @@ def parse_args():
     p.add_argument("--no-pretrained", dest="pretrained", action="store_false")
     p.add_argument("--freeze-backbone", action="store_true", default=True)
     p.add_argument("--no-freeze-backbone", dest="freeze_backbone", action="store_false")
+    p.add_argument("--unfreeze-last-stage", action="store_true", default=False,
+                   help="统一协议：整体冻结骨干后仅解冻最后一个 stage（ResNet50=layer3、VGG16=enc5、MobileNetV3=layer3），需配合 --augment 使用")
+    p.add_argument("--augment", action="store_true", default=False,
+                   help="训练集数据增强（翻转/旋转/色彩抖动）；解冻微调时必须开启，验证集不受影响")
     p.add_argument("--activation", default="relu6", choices=["relu6", "silu"])
     p.add_argument("--sfpn-path", default=None, help="可选：加载 paddle.save 格式的骨干权重（torch 旧权重协议已禁用）")
     # 训练
-    p.add_argument("--epochs", type=int, default=20, help="正式训练上限 20；短训传 8")
+    p.add_argument("--epochs", type=int, default=20, help="v2 协议：正式训练上限 30；短训传 8")
     p.add_argument("--lr", type=float, default=1e-4)
+    p.add_argument("--backbone-lr-mult", type=float, default=0.1,
+                   help="解冻末段时骨干参数组的学习率倍率（默认 0.1，即骨干 lr = --lr × 0.1；不解冻时无效果）")
     p.add_argument("--optimizer", default="adamw", choices=["adamw", "sgd"])
     p.add_argument("--loss", default="dice", choices=["dice", "dice_ce", "dice_wce"])
     p.add_argument("--class-weights", type=float, nargs=7, default=None,
                    help="dice_wce 的类别权重（7 个数，对应输出通道 0-6）")
-    p.add_argument("--patience", type=int, default=5, help="val mIoU 早停轮数（短训建议 99 关闭早停）")
+    p.add_argument("--patience", type=int, default=5, help="val mIoU 早停轮数（短训建议 99 关闭早停；v2 协议正式训练传 8）")
     p.add_argument("--no-scheduler", dest="use_scheduler", action="store_false", default=True,
                    help="关闭 ReduceOnPlateau 调度器，lr 全程恒定（短训建议加：保证各组比较的是初始 lr）")
     p.add_argument("--seed", type=int, default=42)
@@ -66,9 +72,27 @@ def set_seed(seed):
     random.seed(seed)
 
 
-def build_optimizer(name, model, lr, use_scheduler):
-    """梯度裁剪通过优化器 gradient_clip 实现（等价 torch 的 clip_grad_norm_）"""
-    params = [p for p in model.parameters() if not p.stop_gradient]
+def build_optimizer(name, model, lr, use_scheduler, backbone_params=None,
+                    backbone_lr_mult=0.1):
+    """梯度裁剪通过优化器 gradient_clip 实现（等价 torch 的 clip_grad_norm_）。
+
+    backbone_params 非空时启用双学习率参数组：骨干组 lr = 基础 lr × backbone_lr_mult
+    （预训练权重微调用小步长），解码器组保持基础 lr 不变。
+    """
+    trainable = [p for p in model.parameters() if not p.stop_gradient]
+    if backbone_params:
+        backbone_ids = {id(p) for p in backbone_params}
+        bb_params = [p for p in trainable if id(p) in backbone_ids]
+        other_params = [p for p in trainable if id(p) not in backbone_ids]
+        params = [
+            {"params": bb_params, "params_attr": {"learning_rate": backbone_lr_mult}},
+            {"params": other_params},
+        ]
+        n_bb = sum(p.numel() for p in bb_params)
+        print(f"[优化器] 双学习率: 骨干组 {n_bb:,} 参数 × {backbone_lr_mult} | "
+              f"解码器组 {sum(p.numel() for p in other_params):,} 参数 × 1.0")
+    else:
+        params = trainable
     learning_rate = (paddle.optimizer.lr.ReduceOnPlateau(learning_rate=lr, mode='max',
                                                          patience=3, factor=0.5, verbose=False)
                      if use_scheduler else lr)
@@ -134,10 +158,12 @@ def main():
     print(f"[启动] 设备: {place} | 实验: {run_name}")
     print(f"   配置: backbone={args.backbone} lr={args.lr} opt={args.optimizer} "
           f"loss={args.loss} act={args.activation} epochs={args.epochs} seed={args.seed} "
-          f"sched={'on' if args.use_scheduler else 'off'}")
+          f"sched={'on' if args.use_scheduler else 'off'} "
+          f"unfreeze_last_stage={args.unfreeze_last_stage} augment={args.augment}")
 
     # 数据
-    train_set = RemoteSensingDataset(args.train_img, args.train_mask, args.imgsz)
+    train_set = RemoteSensingDataset(args.train_img, args.train_mask, args.imgsz,
+                                     augment=args.augment)
     val_set = RemoteSensingDataset(args.val_img, args.val_mask, args.imgsz)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, drop_last=True, return_list=True)
@@ -146,15 +172,32 @@ def main():
 
     # 模型 / 损失 / 优化器
     model = build_model(args.backbone, args.n_classes, args.pretrained,
-                        args.freeze_backbone, args.activation)
+                        args.freeze_backbone, args.activation,
+                        unfreeze_last_stage=args.unfreeze_last_stage)
     if args.sfpn_path:
         load_sfpn_weights(model.backbone, args.sfpn_path)
+
+    # 解冻末段时收集骨干可训练参数（用于双学习率分组）
+    backbone_params = None
+    if args.unfreeze_last_stage and args.freeze_backbone:
+        bb = getattr(model, "backbone", None)
+        stage = getattr(bb, "layer3", None) if bb is not None else None
+        if stage is None:
+            stage = getattr(model, "enc5", None)   # vgg16_unet 无 .backbone 属性
+        backbone_params = [p for p in stage.parameters() if not p.stop_gradient]
+
     trainable = int(sum(p.numel() for p in model.parameters() if not p.stop_gradient))
     total_p = int(sum(p.numel() for p in model.parameters()))
     print(f"   参数量: 总 {total_p:,} | 可训练 {trainable:,}（模型大小对比用）")
+    if backbone_params:
+        n_bb = sum(p.numel() for p in backbone_params)
+        print(f"   解冻末段: 骨干 {n_bb:,} 参数 (lr={args.lr * args.backbone_lr_mult:g})"
+              f" | 解码器 {trainable - n_bb:,} 参数 (lr={args.lr:g})")
 
     criterion = build_loss(args.loss, args.class_weights)
-    optimizer = build_optimizer(args.optimizer, model, args.lr, args.use_scheduler)
+    optimizer = build_optimizer(args.optimizer, model, args.lr, args.use_scheduler,
+                                backbone_params=backbone_params,
+                                backbone_lr_mult=args.backbone_lr_mult)
     use_amp = (place == 'gpu')
     scaler = paddle.amp.GradScaler(enable=use_amp)
 

@@ -34,6 +34,12 @@ def freeze_layer(layer: nn.Layer):
         p.stop_gradient = True
 
 
+def unfreeze_layer(layer: nn.Layer):
+    """解冻指定 stage（配合 freeze_layer 使用：先整体冻结，再放开最后一个 stage）"""
+    for p in layer.parameters():
+        p.stop_gradient = False
+
+
 class DepthwiseSeparableConv(nn.Layer):
     """深度可分离卷积（移动端核心轻量化模块）"""
 
