@@ -25,16 +25,17 @@ SFPNSegModel = ResNet50SFPN
 
 def build_model(backbone="resnet50", n_classes=7, pretrained=True,
                 freeze_backbone=True, activation="relu6", unfreeze_last_stage=False):
-    """统一入口，resnet50_shallow 为模型 1 的浅层跳连变体。
+    """统一入口，模型 1 可选浅层跳连或自适应多尺度融合。
 
     unfreeze_last_stage：统一协议的末段解冻——整体冻结骨干后，仅放开与解码器
     相连的最后一个 stage（ResNet50=layer3、VGG16=enc5、MobileNetV3=layer3），
     三个模型的冻结范围一致，保证横向对比公平。
     """
-    if backbone in ("resnet50", "resnet50_shallow"):
+    if backbone in ("resnet50", "resnet50_shallow", "resnet50_scale_gate"):
         model = ResNet50SFPN(n_classes=n_classes, pretrained=pretrained,
                              freeze_backbone=freeze_backbone, activation=activation,
-                             shallow_skip=(backbone == "resnet50_shallow"))
+                             shallow_skip=(backbone == "resnet50_shallow"),
+                             adaptive_fusion=(backbone == "resnet50_scale_gate"))
         last_stage = model.backbone.layer3
     elif backbone == "mobilenet_v3":
         model = MobileNetV3SFPN(n_classes=n_classes, pretrained=pretrained,
@@ -45,7 +46,10 @@ def build_model(backbone="resnet50", n_classes=7, pretrained=True,
                           freeze_encoder=freeze_backbone, activation=activation)
         last_stage = model.enc5
     else:
-        raise ValueError(f"未知骨干: {backbone}，可选 resnet50 / resnet50_shallow / vgg16_unet / mobilenet_v3")
+        raise ValueError(
+            f"未知骨干: {backbone}，可选 resnet50 / resnet50_shallow / resnet50_scale_gate / "
+            "vgg16_unet / mobilenet_v3"
+        )
 
     if freeze_backbone and unfreeze_last_stage:
         unfreeze_layer(last_stage)

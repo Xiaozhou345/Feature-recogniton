@@ -32,8 +32,9 @@ def parse_args():
     p.add_argument("--num-workers", type=int, default=2)
     # 模型
     p.add_argument("--backbone", default="resnet50",
-                   choices=["resnet50", "resnet50_shallow", "mobilenet_v3", "vgg16_unet"],
-                   help="resnet50_shallow 为模型 1 的浅层跳连变体")
+                   choices=["resnet50", "resnet50_shallow", "resnet50_scale_gate",
+                            "mobilenet_v3", "vgg16_unet"],
+                   help="模型 1 可选原版、浅层跳连（resnet50_shallow）或自适应融合（resnet50_scale_gate）")
     p.add_argument("--n-classes", type=int, default=7)
     p.add_argument("--pretrained", action="store_true", default=True)
     p.add_argument("--no-pretrained", dest="pretrained", action="store_false")
@@ -85,7 +86,7 @@ def build_optimizer(name, model, lr, use_scheduler, backbone_params=None,
         bb_params = [p for p in trainable if id(p) in backbone_ids]
         other_params = [p for p in trainable if id(p) not in backbone_ids]
         params = [
-            {"params": bb_params, "params_attr": {"learning_rate": backbone_lr_mult}},
+            {"params": bb_params, "learning_rate": backbone_lr_mult},
             {"params": other_params},
         ]
         n_bb = sum(p.numel() for p in bb_params)
@@ -119,7 +120,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scaler, use_amp):
             continue
         scaled = scaler.scale(loss)
         scaled.backward()
-        scaler.minimize(optimizer, scaled)
+        scaler.step(optimizer)
         scaler.update()
         total += float(loss)
         batches += 1
