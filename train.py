@@ -102,8 +102,9 @@ def build_optimizer(name, model, lr, use_scheduler, backbone_params=None,
         return paddle.optimizer.AdamW(learning_rate=learning_rate, parameters=params,
                                       weight_decay=1e-5, grad_clip=clip)
     if name == "sgd":
-        return paddle.optimizer.SGD(learning_rate=learning_rate, parameters=params,
-                                    momentum=0.9, weight_decay=1e-4, grad_clip=clip)
+        # Paddle 的 SGD 不支持 momentum 参数（E 实测报错），带动量须用 Momentum 优化器
+        return paddle.optimizer.Momentum(learning_rate=learning_rate, parameters=params,
+                                         momentum=0.9, weight_decay=1e-4, grad_clip=clip)
     raise ValueError(name)
 
 
