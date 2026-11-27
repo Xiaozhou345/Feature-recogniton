@@ -1,0 +1,9 @@
+﻿排名(按最优 val mIoU),实验,优化器,学习率,损失函数,激活函数,类别权重,最优 epoch,最优 val mIoU,最优 epoch 的 val PA,第8轮 val mIoU,第8轮 val PA,第8轮 train loss,第8轮 val loss,已训练 epoch 数,"训练总用时(秒,8组并行)",最优权重文件,备注
+1,m3_c03,AdamW,0.001,Dice,ReLU6,-,8,0.3824,0.559,0.3824,0.559,0.6555,0.6473,8,29042,C:\zz\runs_local\m3_c03_best.pth,
+2,m3_c02,AdamW,0.0003,Dice,ReLU6,-,8,0.3747,0.5524,0.3747,0.5524,0.6781,0.6501,8,29072,C:\zz\runs_local\m3_c02_best.pth,
+3,m3_c01,AdamW,0.0001,Dice,ReLU6,-,8,0.3567,0.5391,0.3567,0.5391,0.701,0.6622,8,29087,C:\zz\runs_local\m3_c01_best.pth,baseline
+4,m3_c08,AdamW,0.0001,Dice,SiLU,-,8,0.3522,0.5345,0.3522,0.5345,0.7015,0.6637,8,29448,C:\zz\runs_local\m3_c08_best.pth,
+5,m3_c06,AdamW,0.0001,Dice+CE,ReLU6,-,8,0.3429,0.5536,0.3429,0.5536,2.2557,1.9532,8,30067,C:\zz\runs_local\m3_c06_best.pth,loss 含交叉熵项，数值尺度与纯 Dice 不同，不可直接比较，以 val mIoU 为准
+6,m3_c05,SGD(momentum 0.9),0.01,Dice,ReLU6,-,8,0.3333,0.54,0.3333,0.54,0.6969,0.6782,8,29142,C:\zz\runs_local\m3_c05_best.pth,train.py 的 SGD 分支调用 paddle.optimizer.SGD(momentum=) 会报错，经包装器改用 paddle.optimizer.Momentum
+7,m3_c07,AdamW,0.0001,加权 Dice+CE,ReLU6,0.2869 1.0000 1.7235 1.0425 1.9462 0.5980 0.3803,7,0.323,0.4905,0.3218,0.4889,2.3377,1.994,8,30176,C:\zz\runs_local\m3_c07_best.pth,同上；权重来自 dataset_lock/class_weights.txt
+8,m3_c04,AdamW,3e-05,Dice,ReLU6,-,8,0.3077,0.5163,0.3077,0.5163,0.7473,0.7051,8,29076,C:\zz\runs_local\m3_c04_best.pth,

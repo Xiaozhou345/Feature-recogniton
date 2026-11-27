@@ -1,0 +1,13 @@
+INFO: Could not find files for the given pattern(s).
+C:\zz\venv_paddle\Lib\site-packages\paddle\utils\cpp_extension\extension_utils.py:712: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+  warnings.warn(warning_message)
+[数据] 数据集: 图像 835 张, 有效配对 835 对
+shard 1: 25/209 9s
+shard 1: 50/209 17s
+shard 1: 75/209 26s
+shard 1: 100/209 35s
+shard 1: 125/209 44s
+shard 1: 150/209 53s
+shard 1: 175/209 62s
+shard 1: 200/209 71s
+shard 1 done: 209 images, 74s
